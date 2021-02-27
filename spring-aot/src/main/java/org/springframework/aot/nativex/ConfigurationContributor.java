@@ -15,17 +15,23 @@
  */
 package org.springframework.aot.nativex;
 
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.jar.Attributes;
+import java.util.jar.JarFile;
+import java.util.jar.Manifest;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.aot.BootstrapContributor;
 import org.springframework.aot.BuildContext;
 import org.springframework.aot.ResourceFile;
+import org.springframework.boot.loader.tools.MainClassFinder;
 import org.springframework.nativex.AotOptions;
 import org.springframework.nativex.support.ConfigurationCollector;
 import org.springframework.nativex.support.SpringAnalyzer;
@@ -40,7 +46,7 @@ import org.springframework.nativex.type.TypeSystem;
  */
 public class ConfigurationContributor implements BootstrapContributor {
 	
-	private static Log logger = LogFactory.getLog(ConfigurationContributor.class);	
+	private static Log logger = LogFactory.getLog(ConfigurationContributor.class);
 	
 	@Override
 	public void contribute(BuildContext context, AotOptions aotOptions) {
@@ -52,6 +58,10 @@ public class ConfigurationContributor implements BootstrapContributor {
 		context.describeReflection(reflect -> reflect.merge(configurationCollector.getReflectionDescriptor()));
 		context.describeResources(resources -> resources.merge(configurationCollector.getResourcesDescriptors()));
 		context.describeProxies(proxies -> proxies.merge(configurationCollector.getProxyDescriptors()));
+		String mainClass = getMainClass(context);
+		if (mainClass != null) {
+			configurationCollector.addOption("-H:Class=" + mainClass);
+		}
 		byte[] springComponentsFileContents = configurationCollector.getResources("META-INF/spring.components");
 		if (springComponentsFileContents!=null) {
 			logger.debug("Storing synthesized META-INF/spring.components");
@@ -61,7 +71,6 @@ public class ConfigurationContributor implements BootstrapContributor {
 					Path srcMainResourcesFolder = rootPath.resolve(ResourceFile.MAIN_RESOURCES_PATH);
 					Path metaInfFolder = srcMainResourcesFolder.resolve(Paths.get("META-INF"));
 					Files.createDirectories(metaInfFolder);
-					Path springComponentsFile = rootPath.resolve(ResourceFile.SPRING_COMPONENTS_PATH);
 					try (FileOutputStream fos = new FileOutputStream(rootPath.resolve(ResourceFile.SPRING_COMPONENTS_PATH).toFile())) {
 						fos.write(springComponentsFileContents);
 					}
@@ -80,5 +89,23 @@ public class ConfigurationContributor implements BootstrapContributor {
 				}
 			}
 		});
+	}
+
+	private String getMainClass(BuildContext context) {
+		for (String path : context.getClasspath()) {
+			String mainClass = null;
+			try {
+				mainClass = MainClassFinder.findSingleMainClass(new File(path));
+			}
+			catch (IOException e) {
+				logger.error(e);
+			}
+			if (mainClass != null) {
+				logger.debug("ManifestContributor found Spring Boot main class: " + mainClass);
+				return mainClass;
+			}
+		}
+		logger.debug("Unable to find main class");
+		return null;
 	}
 }

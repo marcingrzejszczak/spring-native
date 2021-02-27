@@ -22,9 +22,6 @@
         <!-- Customize native-image arguments with this property -->
         <native.build.args></native.build.args>
 
-        <!-- Specify main class to allow native-image-maven-plugin to find it -->
-        <main.class></main.class>
-
         <!-- Tiny builder allow small footprint and reduced surface attack, you can also use paketobuildpacks/builder:full to have more tool available in the image for debugging -->
         <builder>paketobuildpacks/builder:tiny</builder>
 
@@ -72,7 +69,6 @@
                     <artifactId>native-image-maven-plugin</artifactId>
                     <version>21.0.0</version>
                     <configuration>
-                        <mainClass>${main.class}</mainClass>
                         <imageName>${project.artifactId}</imageName>
                         <buildArgs>${native.build.args}</buildArgs>
                     </configuration>
